@@ -22,7 +22,7 @@ static const char* password = "48575443A95B41AA";
 
 // the fancy async web server
 static AsyncWebServer server(80);
-static AsyncWebSocket wsocket("/ws/log");
+static AsyncWebSocket wsocket("/log");
 
 // some sanity check
 static bool isInited;
@@ -38,11 +38,14 @@ void on_websocket_event(AsyncWebSocket* server, AsyncWebSocketClient* client, Aw
     switch (type)
     {
         case WS_EVT_CONNECT:
+        client->printf("Hello WebSocket client, your id is %d", client->id());
         Serial.printf("[WS] client %u connected\n", client->id());
         break;
+
         case WS_EVT_DISCONNECT:
         Serial.printf("[WS] client %u disconnected\n", client->id());
         break;
+
         // other available events, just for info
         case WS_EVT_DATA:
         case WS_EVT_PONG:
@@ -56,7 +59,13 @@ void on_websocket_event(AsyncWebSocket* server, AsyncWebSocketClient* client, Aw
 
 void websocket_log(const char* message)
 {
-    wsocket.textAll(message);
+    // sending the message len will force websoket to copy the buffer
+    wsocket.textAll(message, strlen(message));
+}
+
+void websocket_maintain()
+{
+    wsocket.cleanupClients();
 }
 
 //........................................................................................LOCAL-FUNC
@@ -125,7 +134,7 @@ void register_endpoint_not_found()
 {
     server.onNotFound([](AsyncWebServerRequest* req) {
         HttpRequest r(req);
-        r.log_to_serial(404, ++count_req);
+        r.print(404, ++count_req);
         r.send_notFound();
     });
 }
@@ -183,7 +192,7 @@ void asyncBackend_register_endpoint(const char* endpoint, HttpRequestHandler han
     server.on(endpoint, method,
         [handlerFunc](AsyncWebServerRequest* req) {     // lambda
             HttpRequest r(req);                         // wrapper class
-            r.log_to_serial(200, ++count_req);          // write using Serial from arduino
+            r.print(200, ++count_req);          // write using Serial from arduino
             handlerFunc(r);                             // invoke hanlder with wrapper as arg
             if (r.wasResponceSent() == false)           // autoresponce on forget to respond
                 r.send_ok("Ok");

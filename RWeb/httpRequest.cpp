@@ -1,5 +1,6 @@
 #include "httpRequest.h"
 
+#include <uniPrinter.h>
 #include <ESPAsyncWebServer.h>
 #include <cstring>
 
@@ -87,20 +88,28 @@ bool HttpRequest::wasResponceSent()       const { return responceSent; }
 AsyncWebServerRequest* HttpRequest::raw() { responceSent = true; return request; }
 
 
-void HttpRequest::log_to_serial(ui16 responceCode, ui32 requestNumber)
+void HttpRequest::print(ui16 responceCode, ui32 requestNumber)
 {
     if (!request) return;
-    Serial.printf("\n%5i [WS] %s <~~ %s", requestNumber, request->methodToString(), request->url());
+    char buff[256];
+    int  len = 0;
+    const ui16 SZ = sizeof(buff);
+
+    len += snprintf(buff + len, SZ - len,
+        "%5i [WS] %s <~ %s", requestNumber, request->methodToString(), request->url().c_str());
+
+    if (len >= SZ) len = SZ - 1;
+
     if (request->params())
     {
         for (ui8 i = 0; i < request->params(); ++i)
         {
             auto param = request->getParam(i);
-            Serial.print( i ? '&' : '?');
-            Serial.print(param->name());
-            Serial.print('=');
-            Serial.print(param->value());
+            len += snprintf(buff + len, SZ - len,
+                "%c%s=%s", i ? '&' : '?', param->name().c_str(), param->value().c_str());
+
+            if (len >= SZ) { len = SZ - 1; break; }
         }
     }
-    Serial.println();
+    SPrint("%s", buff);
 }
