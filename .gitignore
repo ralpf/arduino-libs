@@ -1,9 +1,12 @@
 # ignore all by default
 *
 
+# allow directory traversing
+!*/
+
 # whitelist
 !.gitignore
-!RUtils/
-!RComponent/
-!RWeb/
+!RUtils/**
+!RComponent/**
+!RWeb/**
 
