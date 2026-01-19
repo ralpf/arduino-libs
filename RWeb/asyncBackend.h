@@ -4,13 +4,14 @@
 
 
 // delegate
-using HttpRequestHandler = void (*)(HttpRequest& request);
+using HttpRequestHandler = void (*)(HttpRequest& request, const char* endpoint);
 
 // call once before _start()
 void asyncBackend_init();
 
 // use this to add endpoints
 void asyncBackend_register_endpoint(const char* endpoint, HttpRequestHandler handlerFunc, HttpRequest::Method type = HttpRequest::Method::Get);
+void asyncBackend_register_endpoint2(const char* endpoint, HttpRequestHandler handlerFunc, HttpRequest::Method type = HttpRequest::Method::Get);
 
 // call after all endpoints are attached
 void asyncBackend_start();

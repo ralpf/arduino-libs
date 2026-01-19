@@ -114,14 +114,14 @@ bool validate_endpoint(const char* endpoint)
 
 //.........................................................................................ENDPOINTS
 
-void endpoint_test_handler(HttpRequest& request)
+void endpoint_test_handler(HttpRequest& request, const char* discard)
 {
     SPrint("Received [test] request");
     // not sending respoce will cause auto responce 200 Ok
 }
 
 
-void endpoint_root_handler(HttpRequest& request)
+void endpoint_root_handler(HttpRequest& request, const char* discard)
 {
     // this raw send does send 200 code itself
     // also using raw will bypass custom auto-send responce in asyncBackend_register_endpoint()
@@ -187,13 +187,12 @@ void asyncBackend_register_endpoint(const char* endpoint, HttpRequestHandler han
     ASSERT(isInited, "ERR: init first before attaching endpoints");
     ASSERT(validate_endpoint(endpoint), "ERR: invalid endpoint");
     ASSERT(!isStarted, "ERR: can't attach more endpoints after server was started");
-    SPrint("[AsyncBackend]: new endpoint -> %s: '%s'", methodName, endpoint);
     // do register function
     server.on(endpoint, method,
-        [handlerFunc](AsyncWebServerRequest* req) {     // lambda
+        [handlerFunc,endpoint](AsyncWebServerRequest* req) {     // lambda
             HttpRequest r(req);                         // wrapper class
-            r.print(200, ++count_req);          // write using Serial from arduino
-            handlerFunc(r);                             // invoke hanlder with wrapper as arg
+            r.print(200, ++count_req);                  // write using Serial from arduino
+            handlerFunc(r,endpoint);                    // invoke hanlder with wrapper as arg. The endpoint name is for debug
             if (r.wasResponceSent() == false)           // autoresponce on forget to respond
                 r.send_ok("Ok");
         }
