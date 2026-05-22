@@ -25,7 +25,7 @@ CRGB html_2_rgb(const char* html)
         return -1;
     };
 
-    ui32 err_col = 0xFF8080;
+    CRGB err_col(0xFF8080);
     if (!html) return err_col;
 
     ui16 len = 0;
@@ -139,6 +139,7 @@ CRGB hsv_2_rgb_slow(const CHSV &hsv)
 
 CHSV rgb_2_hsv_fast(const CRGB &rgb)
 {
+    // this can break the colors bad
     return rgb2hsv_approximate(rgb);    // fastled
 }
 
