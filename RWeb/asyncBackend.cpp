@@ -141,11 +141,11 @@ void register_endpoint_not_found()
 
 //............................................................................................HEADER
 
-void asyncBackend_init()
+void asyncBackend_init(bool initFileSystem, bool initWebSocket)
 {
     init_wifi_server();
-    init_frontend();
-    init_websocket();
+    if (initFileSystem) init_frontend();
+    if (initWebSocket)  init_websocket();
     isInited = true;
 }
 

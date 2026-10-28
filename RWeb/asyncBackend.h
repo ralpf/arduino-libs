@@ -7,7 +7,7 @@
 using HttpRequestHandler = void (*)(HttpRequest& request, const char* endpoint);
 
 // call once before _start()
-void asyncBackend_init();
+void asyncBackend_init(bool initFileSystem = true, bool initWebSocket = true);
 
 // use this to add endpoints
 void asyncBackend_register_endpoint(const char* endpoint, HttpRequestHandler handlerFunc, HttpRequest::Method type = HttpRequest::Method::Get);
