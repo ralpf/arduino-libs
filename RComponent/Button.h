@@ -12,9 +12,11 @@ class Button : public ComponentBase
     ui8     pin;
     ui16    debounce;
     bool    isPullup;
-    bool    logicalDown;
-    bool    phaseDown;
-    bool    phaseUp;
+    bool    logicalDown = 0;
+    bool    phaseDown   = 0;
+    bool    phaseUp     = 0;
+    bool    physicalDown = 0;
+    ui32    changedTime = 0;
 
     //..........CTOR
     public:

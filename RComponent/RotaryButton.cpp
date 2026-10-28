@@ -4,13 +4,26 @@
 #include <Arduino.h>
 
 
-RotaryButton::RotaryButton(ui8 pinBT, ui8 pinDT, ui8 pinCLK, bool isPullup) : Button(pinBT, isPullup, 0)
+
+
+// encoder transition matrix
+// Rows: previous state; Columns: current state.
+static const i8 rotaryTransitions[4][4] = {
+    //  0   1   2   3
+    {   0, -1,  1,  0 },     // 0
+    {   1,  0,  0, -1 },     // 1
+    {  -1,  0,  0,  1 },     // 2
+    {   0,  1, -1,  0 }      // 3
+};
+
+
+RotaryButton::RotaryButton(ui8 pinBT, ui8 pinDT, ui8 pinCLK, bool isPullup) : Button(pinBT, isPullup)
 {
-    // 0 - no debounce
     this->pinDT  = pinDT;
     this->pinCLK = pinCLK;
     pinMode(pinDT,  isPullup ? INPUT_PULLUP : INPUT);
     pinMode(pinCLK, isPullup ? INPUT_PULLUP : INPUT);
+    rotState = ReadRotaryState();
 }
 
 
@@ -18,32 +31,39 @@ bool RotaryButton::Update()
 {
     bool changed = Button::Update();
 
-    this->phaseCW  = false;
-    this->phaseCCW = false;
+    phaseCW  = false;
+    phaseCCW = false;
 
-    ui8 currState = this->ReadRotaryState();
-    if (this->rotState != currState)
+    ui8 currState = ReadRotaryState();
+    if (rotState != currState)
     {
-        if (rotState != 0 && currState == 0)        // finishing rotation
+        if ((rotState ^ currState) == 3)  // both bits changed: missed or invalid transition
+            rotSteps = 0;
+        else
+            rotSteps += rotaryTransitions[rotState][currState];
+
+        rotState = currState;
+
+        if (currState == 0)
         {
-            if (rotState == 1) phaseCW  = true;
-            if (rotState == 2) phaseCCW = true;
+            if (rotSteps ==  4) phaseCW  = true;
+            if (rotSteps == -4) phaseCCW = true;
+            rotSteps = 0;
         }
-        this->rotState = currState;
     }
-    return changed | this->phaseCW | this->phaseCCW;
+    return changed | phaseCW | phaseCCW;
 }
 
 
 bool RotaryButton::IsClockWise()
 {
-    return phaseCW;
+    return !isInverted ? phaseCW : phaseCCW;
 }
 
 
 bool RotaryButton::IsCounterClockWise()
 {
-    return phaseCCW;
+    return !isInverted ? phaseCCW : phaseCW;
 }
 
 
@@ -53,9 +73,15 @@ void RotaryButton::Info()
 }
 
 
+void RotaryButton::InvertRotation(bool invert)
+{
+    isInverted = invert;
+}
+
+
 ui8 RotaryButton::ReadRotaryState()
 {
-    bool dt  = digitalRead(this->pinDT)  == (this->isPullup ? 0 : 1);
-    bool clk = digitalRead(this->pinCLK) == (this->isPullup ? 0 : 1);
+    bool dt  = digitalRead(pinDT)  == (isPullup ? 0 : 1);
+    bool clk = digitalRead(pinCLK) == (isPullup ? 0 : 1);
     return (dt << 1) | clk;     // merge 2 bits in one byte
 }

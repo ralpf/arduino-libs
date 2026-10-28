@@ -26,26 +26,26 @@ Button::Button(ui8 pin, bool isPullup, ui16 debounce)
 
 bool Button::Update()
 {
-    this->phaseDown = false;
-    this->phaseUp   = false;
+    phaseDown = false;
+    phaseUp   = false;
 
-    int state = digitalRead(this->pin);
-    bool physicalDown = state == (isPullup ? 0 : 1);
+    bool state = digitalRead(pin) == (isPullup ? 0 : 1);
+    ui32 now = millis();
 
-    if (physicalDown != logicalDown)
+    if (state != physicalDown)
     {
-        // here we are once per phase transition
-        logicalDown = physicalDown;
-        if (this->debounce)     // cast from int
-        {
-            SPrint("e: debounce not implemented");
-            // this can return early
-        }
-
-        if (logicalDown) phaseDown = true;
-        else             phaseUp   = true;
+        physicalDown = state;
+        changedTime = now;
     }
-    return this->phaseDown | this->phaseUp;
+
+    if (physicalDown == logicalDown)  return false;
+    if (now - changedTime < debounce) return false;
+
+    logicalDown = physicalDown;
+    if (logicalDown) phaseDown = true;
+    else             phaseUp   = true;
+
+    return true;
 }
 
 
