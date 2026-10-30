@@ -1,6 +1,6 @@
 #include "uniPrinter.h"
 
-#include <asyncWebsocket.h>
+#include <asyncBackend.h>
 #include <Arduino.h>
 
 
@@ -28,7 +28,7 @@ void SPrint(const char *format, ...)
     va_start(args, format);
     vsnprintf(printerBuffer, PRINTER_BUFFER_SZ, format, args);
     Serial.println(printerBuffer);
-    websocket_log(printerBuffer);
+    asyncBackend_push_log(printerBuffer);
     va_end(args);
 }
 

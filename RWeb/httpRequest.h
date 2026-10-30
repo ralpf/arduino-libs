@@ -8,7 +8,7 @@ class AsyncWebServerRequest;    // forward declaration, lives in ESPAsyncWebServ
 class HttpRequest
 {
     public:     // TYPE
-    enum class Method : ui8 { Get, Post };
+    //enum class Method : ui8 { Get, Post };
 
     public:     // METHOD
     //Method method() const;

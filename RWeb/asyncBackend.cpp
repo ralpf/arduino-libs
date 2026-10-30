@@ -1,16 +1,21 @@
 #include "asyncBackend.h"
+#include "asyncWebsocket.h"
 
 #include <uniPrinter.h>
 #include <assertCrash.h>
+
 
 #include <WiFi.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <ESPAsyncWebServer.h>
+#include <ArduinoOTA.h>
+
 
 #ifndef IP_ADDRESS_4
   #error "IP_ADDRESS_4 symbol not #defined !! It sets the last byte of 192.168.100.* "
 #endif
+
 
 //............................................................................................STATIC
 
@@ -22,51 +27,13 @@ static const char* password = "48575443A95B41AA";
 
 // the fancy async web server
 static AsyncWebServer server(80);
-static AsyncWebSocket wsocket("/log");
 
 // some sanity check
-static bool isInited;
-static bool isStarted;
+static bool isInited;       // the system overall
+static bool isStarted;      // http server running
 
 // some fun
 static ui32 count_req;
-
-//.................................................................................WEBSOCKET-HANLDER
-
-void on_websocket_event(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t data_len)
-{
-    switch (type)
-    {
-        case WS_EVT_CONNECT:
-        client->printf("Hello WebSocket client, your id is %d", client->id());
-        Serial.printf("[WS] client %u connected\n", client->id());
-        break;
-
-        case WS_EVT_DISCONNECT:
-        Serial.printf("[WS] client %u disconnected\n", client->id());
-        break;
-
-        // other available events, just for info
-        case WS_EVT_DATA:
-        case WS_EVT_PONG:
-        case WS_EVT_ERROR:
-        default:
-        break;
-    }
-}
-
-//..................................................................................WEBSOCKET-HEADER
-
-void websocket_log(const char* message)
-{
-    // sending the message len will force websoket to copy the buffer
-    wsocket.textAll(message, strlen(message));
-}
-
-void websocket_maintain()
-{
-    wsocket.cleanupClients();
-}
 
 //........................................................................................LOCAL-FUNC
 
@@ -98,10 +65,18 @@ void init_frontend()
 }
 
 
-void init_websocket()
+void init_websockets(bool initWebSocketLog, bool initWebSocketControl)
 {
-    server.addHandler(&wsocket);
-    wsocket.onEvent(on_websocket_event);
+    if (initWebSocketLog)
+    {
+        server.addHandler(&ws_log);
+        ws_log.onEvent(on_websocket_log_event);
+    }
+    if (initWebSocketControl)
+    {
+        server.addHandler(&ws_ctrl);
+        ws_ctrl.onEvent(on_websocket_ctrl_event);
+    }
 }
 
 
@@ -141,12 +116,15 @@ void register_endpoint_not_found()
 
 //............................................................................................HEADER
 
-void asyncBackend_init(bool initFileSystem, bool initWebSocket)
+// will init the fs, prepare to start the http server, and some websockets
+void asyncBackend_init(bool initWebSocketLog, bool initWebSocketControl)
 {
     init_wifi_server();
-    if (initFileSystem) init_frontend();
-    if (initWebSocket)  init_websocket();
+    init_frontend();
+    init_websockets(initWebSocketLog, initWebSocketControl);
+    ArduinoOTA.begin();     // other-the-air update
     isInited = true;
+    SPrint("OTA updates ready");
 }
 
 
@@ -156,8 +134,8 @@ void asyncBackend_start()
     ASSERT(!isStarted, "ERR: server was already started");
 
     // endpoints available in all projects
-    asyncBackend_register_endpoint("/", endpoint_root_handler);
-    asyncBackend_register_endpoint("/test", endpoint_test_handler);
+    asyncBackend_register_get_endpoint("/", endpoint_root_handler);
+    asyncBackend_register_get_endpoint("/esp/test", endpoint_test_handler);
     // invalid endpoints
     register_endpoint_not_found();
 
@@ -166,35 +144,41 @@ void asyncBackend_start()
 }
 
 
-void asyncBackend_register_endpoint(const char* endpoint, HttpRequestHandler handlerFunc, HttpRequest::Method type)
+void asyncBackend_maintain()
 {
-    // just resolve method type block
-    const char* methodName = "";
-    WebRequestMethod method = HTTP_ANY;
-    switch (type)
-    {
-        case HttpRequest::Method::Get:
-        method = HTTP_GET;
-        methodName = "GET";
-        break;
-        case HttpRequest::Method::Post:
-        method = HTTP_POST;
-        methodName = "POST";
-        break;
-        default: ASSERT(false, "unexpected method type");
-    }
+    ArduinoOTA.handle();    // check for firmware update
+    websockets_maintain();  // cleanup clients
+}
+
+
+void asyncBackend_push_log(const char* message)
+{
+    ws_log_send_message(message);
+}
+
+//...................................................................................CB REGISTRATION
+
+void asyncBackend_register_get_endpoint(const char* endpoint, HttpRequestHandler handlerFunc)
+{
     // sanity check and report
     ASSERT(isInited, "ERR: init first before attaching endpoints");
     ASSERT(validate_endpoint(endpoint), "ERR: invalid endpoint");
     ASSERT(!isStarted, "ERR: can't attach more endpoints after server was started");
-    // do register function
-    server.on(endpoint, method,
+    // do register function callback
+    server.on(endpoint, HTTP_GET,
         [handlerFunc,endpoint](AsyncWebServerRequest* req) {     // lambda
             HttpRequest r(req);                         // wrapper class
-            r.print(200, ++count_req);                  // write using Serial from arduino
+            r.print(200, ++count_req);                  // print to serial
             handlerFunc(r,endpoint);                    // invoke hanlder with wrapper as arg. The endpoint name is for debug
             if (r.wasResponceSent() == false)           // autoresponce on forget to respond
                 r.send_ok("Ok");
         }
     );
 }
+
+
+void asyncBackend_register_ws_control(WsMessageHandler handlerFunc)
+{
+    ws_ctrl_register_handler(handlerFunc);
+}
+
